@@ -14,7 +14,7 @@ def init():
     print("Wprowadź ścieżkę dostępu do sygnału EEG w formacie .edf \nlub wciśnij ENTER, żeby wybrać domyślny zestaw danych.")
     path = input("Ścieżka dostępu:")
     if path is None or len(path) == 0 or path != '.*.edf$':
-        path = 'data/BCI/files/s01/rc01.edf'
+        path = 's01/rc01.edf'
 
     raw = mne.io.read_raw_edf(path, preload=True)
     events = mne.events_from_annotations(raw)
