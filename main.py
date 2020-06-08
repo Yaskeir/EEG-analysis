@@ -20,7 +20,7 @@ def init():
         "lub wciśnij ENTER, żeby wybrać domyślny zestaw danych.")
     path = input("Ścieżka dostępu:")
     if path is None or len(path) == 0 or path != '.*.edf$':
-        path = 'data/BCI/files/s01/rc01.edf'
+        path = 's01/rc01.edf'
     try:
         raw = mne.io.read_raw_edf(path, preload=True)
         events = mne.events_from_annotations(raw)
