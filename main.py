@@ -1,8 +1,8 @@
 import warnings
 warnings.filterwarnings("ignore", "(?s).*MATPLOTLIBDATA.*", category=UserWarning)
-import numpy as np
 import matplotlib.pyplot as plt
 import mne
+from mne.viz import tight_layout
 import sys
 import time
 from pynput.keyboard import Key, Listener
@@ -52,6 +52,12 @@ def init():
     print("Wyświetlam uśrednione przebiegi z wszystkich kanałów.")
     evoked.plot(window_title="Uśrednione przebiegi z wszystkich kanałów", time_unit="ms")
 
+    
+    
+    
+
+
+
     print("Wyświetlam zestawienie przebiegów uśrednionych po znacznikach w zależności od kanału.")
     evoked.plot_image(time_unit="ms", titles="Porównanie uśrednionych przebiegów pomiędzy kanałami\n\n")
 
@@ -59,9 +65,13 @@ def init():
     for i in range(0, ch_number):              # uśrednianie przebiegów dla każdego z wybranych kanałów
         averages.append(epochs[i].average())
 
-    print("Wyświetlam porównanie przebiegów pomiędzy rodzajami znaczników.\nUWAGA: w analizowanym zestawie danych występuje tylko jeden rodzaj znaczników.")
-    mne.viz.plot_compare_evokeds(averages, picks=ch_list, cmap='Accent', combine='mean',
-                                 title="Porównanie uśrednionych przebiegów pomiędzy rodzajami znaczników")
+    print("Wyświetlam porównanie przebiegów pomiędzy rodzajami znaczników.")
+
+
+    mne.viz.plot_compare_evokeds(averages, picks=ch_list, cmap='Accent', combine='std',
+                                 title="Porównanie uśrednionych przebiegów pomiędzy rodzajami znaczników", ci=True)
+    
+    
 
     plt.show()
 
