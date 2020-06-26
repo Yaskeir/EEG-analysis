@@ -17,14 +17,14 @@ def init():
     print("Program przetwarzający potencjały wywołane w sygnale EEG.\n")
     print(
         "Wprowadź ścieżkę dostępu do sygnału EEG w formacie .edf\n"
-        "lub wciśnij ENTER, żeby wybrać domyślny zestaw danych.")
+        "lub wciśnij ENTER, żeby wybrać domyślny zestaw danych.\n")
     path = input("Ścieżka dostępu:")
     if path is None or len(path) == 0 or path != '.*.edf$':
         path = 's01/rc01.edf'
     try:
         raw = mne.io.read_raw_edf(path, preload=True)
         events = mne.events_from_annotations(raw)
-    except:
+    except IOError:
         print("Wystąpił problem ze znalezieniem domyślnej ścieżki.\n"
                  "Brakuje pliku o lokalizacji ./s01/rc01.edf.")
         time.sleep(5)
@@ -36,9 +36,9 @@ def init():
             ch_number = 5
         ch_list = list(raw.ch_names[:ch_number])
     except ValueError:
-        print("Podano niewłaściwą liczbę kanałów. Proszę spróbować ponownie.")
-        time.sleep(5)
-        sys.exit()
+        print("Podano niewłaściwą liczbę kanałów. Ustawiam domyślną wartość 2 kanałów.")
+        ch_number = 2
+        ch_list = list(raw.ch_names[:ch_number])
 
     epochs = mne.Epochs(raw, events[0], event_id=events[1], tmin=-0.2, tmax=0.5, picks='eeg', preload=True)
 
@@ -51,11 +51,6 @@ def init():
 
     print("Wyświetlam uśrednione przebiegi z wszystkich kanałów.")
     evoked.plot(window_title="Uśrednione przebiegi z wszystkich kanałów", time_unit="ms")
-
-    
-    
-    
-
 
 
     print("Wyświetlam zestawienie przebiegów uśrednionych po znacznikach w zależności od kanału.")
@@ -72,7 +67,6 @@ def init():
                                  title="Porównanie uśrednionych przebiegów pomiędzy rodzajami znaczników", ci=True)
     
     
-
     plt.show()
 
     print("\n\nAnaliza zakończona sukcesem.")
@@ -87,5 +81,5 @@ def on_press(key):                              # funkcja nasłuchującą wcisni
     elif key == Key.esc:
         sys.exit()
 
-
 init()
+
