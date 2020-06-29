@@ -1,11 +1,9 @@
-import warnings
-warnings.filterwarnings("ignore", "(?s).*MATPLOTLIBDATA.*", category=UserWarning)
-import matplotlib.pyplot as plt
 import mne
-from mne.viz import tight_layout
 import sys
 import time
+from numpy import amax
 from pynput.keyboard import Key, Listener
+
 
 # Mateusz Fido, ZFBM Biofizyka molekularna
 #
@@ -13,6 +11,7 @@ from pynput.keyboard import Key, Listener
 
 
 def init():
+    global evoked
     print("2019L Metody Fizyczne w Biologii i Medycynie \n")
     print("Program przetwarzający potencjały wywołane w sygnale EEG.\n")
     print(
@@ -23,51 +22,71 @@ def init():
         path = 's01/rc01.edf'
     try:
         raw = mne.io.read_raw_edf(path, preload=True)
-        events = mne.events_from_annotations(raw)
+        events, event_dict = mne.events_from_annotations(raw)
+        for key in list(event_dict):                # usuń niepotrzebne znaczniki zaczynające się od "#"
+            if key.startswith('#'):
+                del event_dict[key]
+
     except IOError:
         print("Wystąpił problem ze znalezieniem domyślnej ścieżki.\n"
-                 "Brakuje pliku o lokalizacji ./s01/rc01.edf.")
+              "Brakuje pliku o lokalizacji ./s01/rc01.edf.")
         time.sleep(5)
         sys.exit()
 
-    try:
-        ch_number = int(input("\nZnaleziono " + str(len(raw.ch_names)) + " kanałów. Ile z nich wyświetlić?:"))
-        if ch_number is None or ch_number == "" or ch_number > len(raw.ch_names):
-            ch_number = 5
-        ch_list = list(raw.ch_names[:ch_number])
-    except ValueError:
-        print("Podano niewłaściwą liczbę kanałów. Ustawiam domyślną wartość 2 kanałów.")
-        ch_number = 2
-        ch_list = list(raw.ch_names[:ch_number])
+    print("\n\nZnaleziono {} kanałów oraz następujące znaczniki:".format(str(len(raw.ch_names))))
 
-    epochs = mne.Epochs(raw, events[0], event_id=events[1], tmin=-0.2, tmax=0.5, picks='eeg', preload=True)
+    print(event_dict,'\n')
 
-    print("Wyświetlam wybrane kanały.")
+    raw.crop(2, 42)                                # przytnij i przefiltruj surowe dane
+    raw.filter(1.0, 48.0, filter_length='auto')
 
-    title = "Sygnały ciągłe dla każdego z {} kanałów podzielone na segmenty".format(ch_number)
-    epochs.plot(picks=ch_list, block=True, title=title)
+    raw.plot(block=True, title="Zestawienie wszystkich kanałów z zaznaczonymi znacznikami. Kliknij na kanał, aby usunąć go z analizy.")
 
-    evoked = epochs.average()                   # uśrednianie przebiegu dla każdego znacznika
+    bad_channels = raw.info['bads']
+    raw_data = raw.get_data()
 
-    print("Wyświetlam uśrednione przebiegi z wszystkich kanałów.")
-    evoked.plot(window_title="Uśrednione przebiegi z wszystkich kanałów", time_unit="ms")
+    index = -1
+    for channel in raw_data:
+        index += 1
+        if amax(channel) > 100e-6:
+            bad_channels.append(raw.ch_names[index])
+
+    raw.drop_channels(bad_channels)
+
+    epochs = mne.Epochs(raw, events=events, event_id=event_dict, tmin=-0.2, tmax=0.5, preload=True)
+
+    evoked_list = []
+    for condition in event_dict:
+        evoked_list.append(epochs[condition].average())     # uśrednij odpowiedź dla każdego znacznika
+                                                            # (20 eventów w domyślnym zestawie danych)
+
+    evoked_responses = []
+    peaks = []
+
+    for evoked in evoked_list:
+        peak = evoked.get_peak(mode='pos', return_amplitude=True)   # znajdź kanał z najsilniejszą odpowiedzią
+        if (0.45 > peak[1] > 0.2): #and peak[2] > 6e-6:     #   jeśli latencja odpowiada potencjałowi P300 i amplituda większa niż szum
+            peaks.append(peak)
+            evoked_responses.append(evoked)
+
+    print(evoked_responses)
+
+    for peak, key in zip(peaks, event_dict):
+        print("Dla znacznika {} znaleziono odpowiedź o amplitudzie {} \u03BCV na kanale {} w czasie {}".format(str(key), str(round(peak[2]*1.0e6, 2)), peak[0], peak[1]))
+
+    for evoked, peak, key in zip(evoked_responses, peaks, event_dict):
+        title = "Odpowiedź na kanale {} dla znacznika {}".format(peak[0], str(key))
+        evoked.plot(picks=peaks[0], titles=title)
 
 
-    print("Wyświetlam zestawienie przebiegów uśrednionych po znacznikach w zależności od kanału.")
-    evoked.plot_image(time_unit="ms", titles="Porównanie uśrednionych przebiegów pomiędzy kanałami\n\n")
-
-    averages = []
-    for i in range(0, ch_number):              # uśrednianie przebiegów dla każdego z wybranych kanałów
-        averages.append(epochs[i].average())
-
-    print("Wyświetlam porównanie przebiegów pomiędzy rodzajami znaczników.")
-
-
-    mne.viz.plot_compare_evokeds(averages, picks=ch_list, cmap='Accent', combine='std',
-                                 title="Porównanie uśrednionych przebiegów pomiędzy rodzajami znaczników", ci=True)
-    
-    
-    plt.show()
+    # for evoked in evoked_list:
+    #     evoked_averages.append(np.mean(evoked.data, axis=0))
+    #                                                                   #   dwie pętle pozwalające
+    #                                                                   #   na uśrednienie po wszystkich
+    #                                                                   #   kanałach: nie dają sensownych wyników
+    # for evoked in evoked_averages:
+    #     plt.plot(evoked)
+    #     plt.show()
 
     print("\n\nAnaliza zakończona sukcesem.")
     print("Wciśnij ENTER, żeby przeprowadzić analizę\nponownie lub ESC, żeby zakończyć.")
@@ -75,11 +94,11 @@ def init():
         listener.join()
 
 
-def on_press(key):                              # funkcja nasłuchującą wcisnięcie klawisza ENTER bądź ESC
+def on_press(key):  # funkcja nasłuchującą wcisnięcie klawisza ENTER bądź ESC
     if key == Key.enter:
         init()
     elif key == Key.esc:
         sys.exit()
 
-init()
 
+init()
